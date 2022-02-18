@@ -18,9 +18,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 #include "kernel.h"
+#include <circle/memory.h>
 
 extern "C" int _main (void);
-extern "C" void mouse_callback (unsigned nButtons, int nDisplacementX, int nDisplacementY);
+extern "C" void mouse_callback (unsigned nButtons, int nDisplacementX, int nDisplacementY,
+				int nWheelMove);
 
 static const char FromKernel[] = "kernel";
 
@@ -29,7 +31,7 @@ CKernel::CKernel (void)
 	m_Timer (&m_Interrupt),
 	m_Logger (m_Options.GetLogLevel (), &m_Timer),
 	m_USBHCI (&m_Interrupt, &m_Timer),
-	m_VCHIQ (&m_Memory, &m_Interrupt)
+	m_VCHIQ (CMemorySystem::Get (), &m_Interrupt)
 {
 	m_ActLED.Blink (5);	// show we are alive
 }

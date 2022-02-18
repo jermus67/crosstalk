@@ -2,7 +2,7 @@
 // bcm2835.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -222,6 +222,7 @@
 #define ARM_PM_BASE		(ARM_IO_BASE + 0x100000)
 
 #define ARM_PM_RSTC		(ARM_PM_BASE + 0x1C)
+#define ARM_PM_RSTS		(ARM_PM_BASE + 0x20)
 #define ARM_PM_WDOG		(ARM_PM_BASE + 0x24)
 #define ARM_PM_PADS0		(ARM_PM_BASE + 0x2C)    // GPIO 0 - 27
 #define ARM_PM_PADS1		(ARM_PM_BASE + 0x30)    // GPIO 28 - 45
@@ -231,6 +232,7 @@
 #define ARM_PM_RSTC_CLEAR	0xFFFFFFCF
 #define ARM_PM_RSTC_REBOOT	0x00000020
 #define ARM_PM_RSTC_RESET	0x00000102
+#define ARM_PM_RSTS_PART_CLEAR	0xFFFFFAAA
 #define ARM_PM_WDOG_TIME	0x000FFFFF
 #define ARM_PADS_SLEW		(0x01 << 4)
 #define ARM_PADS_HYST		(0x01 << 3)
@@ -323,5 +325,18 @@
 //
 #define ARM_VCHIQ_BASE		(ARM_IO_BASE + 0xB840)
 #define ARM_VCHIQ_END		(ARM_VCHIQ_BASE + 0x0F)
+
+//
+// VC4/5 HDMI
+//
+#if RASPPI <= 3
+#define ARM_HDMI_BASE		(ARM_IO_BASE + 0x902000)
+#define ARM_HD_BASE		(ARM_IO_BASE + 0x808000)
+#else
+#define ARM_HDMI_BASE		(ARM_IO_BASE + 0xF00700)
+#define ARM_HD_BASE		(ARM_IO_BASE + 0xF20000)
+#define ARM_PHY_BASE		(ARM_IO_BASE + 0xF00F00)
+#define ARM_RAM_BASE		(ARM_IO_BASE + 0xF01B00)
+#endif
 
 #endif

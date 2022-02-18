@@ -2,7 +2,7 @@
 // kernel.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2016  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2016-2021  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@
 #ifndef _kernel_h
 #define _kernel_h
 
-#include <circle/memory.h>
 #include <circle/actled.h>
 #include <circle/koptions.h>
 #include <circle/devicenameservice.h>
@@ -36,7 +35,7 @@
 #include <circle/usb/usbhcidevice.h>
 #include <circle/gpioclock.h>
 #include <circle/gpiopin.h>
-#include <circle/input/touchscreen.h>
+#include <circle/input/rpitouchscreen.h>
 #include <ugui/uguicpp.h>
 #include <circle/types.h>
 
@@ -59,7 +58,6 @@ public:
 
 private:
 	// do not change this order
-	CMemorySystem		m_Memory;
 	CActLED			m_ActLED;
 	CKernelOptions		m_Options;
 	CDeviceNameService	m_DeviceNameService;
@@ -75,7 +73,7 @@ private:
 	CUSBHCIDevice		m_USBHCI;
 	CGPIOClock		m_Clock0;
 	CGPIOPin		m_ClockPin;
-	CTouchScreenDevice	m_TouchScreen;
+	CRPiTouchScreen		m_RPiTouchScreen;
 	CUGUI			m_GUI;
 };
 

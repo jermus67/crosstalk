@@ -2,7 +2,7 @@
 // xhciconfig.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2019  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2019-2020  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,22 +20,32 @@
 #ifndef _circle_usb_xhciconfig_h
 #define _circle_usb_xhciconfig_h
 
+#include <circle/sysconfig.h>
+
 //#define XHCI_DEBUG
 //#define XHCI_DEBUG2
 
 //
 // PCIe Configuration
 //
+#ifndef USE_XHCI_INTERNAL
+#define XHCI_PCIE_BUS			1
 #define XHCI_PCIE_SLOT			0
 #define XHCI_PCIE_FUNC			0
 
 #define XHCI_PCI_CLASS_CODE		0xC0330
+#endif
 
 //
 // Driver Configuration
 //
+#ifdef USE_XHCI_INTERNAL
+#define XHCI_CONFIG_MAX_SLOTS		64
+#define XHCI_CONFIG_MAX_PORTS		1
+#else
 #define XHCI_CONFIG_MAX_SLOTS		32
 #define XHCI_CONFIG_MAX_PORTS		5
+#endif
 
 #define XHCI_CONFIG_EVENT_RING_SIZE	64
 #define XHCI_CONFIG_CMD_RING_SIZE	64
@@ -53,6 +63,9 @@
 //
 // USB2: Port 1, HSO=1, IHI=1, HLC=0, PSIC=1 (PSIV=3, PSIE=2, PLT=0, PFD=0, PSIM=480)
 // USB3: Port 2-5, PSIC=1 (PSIV=4, PSIE=3, PLT=0, PFD=1, PSIM=5)
+//
+// Internal controller:
+// USB2: Port 1, HSO=0, IHI=0, HLC=1, BLC=1, MHD=0, PSIC=0
 //
 #define XHCI_IS_USB2_PORT(portid)	((portid) == 1)
 

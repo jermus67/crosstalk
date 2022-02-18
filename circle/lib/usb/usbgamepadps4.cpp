@@ -2,7 +2,7 @@
 // usbgamepadps4.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2018  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 //
 // This driver was developed by:
 //	Jose Luis Sanchez, http://jspeccy.speccy.org/
@@ -159,11 +159,11 @@ boolean CUSBGamePadPS4Device::Configure (void)
 
 	if (s_bTouchpadEnabled)
 	{
-		m_pMouseDevice = new CMouseDevice;
+		m_pMouseDevice = new CMouseDevice(1);
 		assert (m_pMouseDevice != 0);
 	}
 
-	m_State.nbuttons = REPORT_BUTTONS;
+	m_State.nbuttons = GAMEPAD_BUTTONS_WITH_TOUCHPAD;
 	m_State.nhats = REPORT_HATS;
 	m_State.naxes = REPORT_AXIS + REPORT_ANALOG_BUTTONS;
 	for (int axis = 0; axis < REPORT_AXIS + REPORT_ANALOG_BUTTONS; axis++) {
@@ -346,7 +346,7 @@ void CUSBGamePadPS4Device::HandleTouchpad (const u8 *pReportBuffer)
 			assert (m_pMouseDevice != 0);
 			m_pMouseDevice->ReportHandler (  m_Touchpad.bButtonPressed
 						       ? MOUSE_BUTTON_LEFT : 0,
-						       nDisplacementX, nDisplacementY);
+						       nDisplacementX, nDisplacementY, 0);
 
 			bButtonChanged = FALSE;
 			nDisplacementX = 0;

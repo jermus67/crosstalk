@@ -2,7 +2,7 @@
 # Rules.mk
 #
 # Circle - A C++ bare metal environment for Raspberry Pi
-# Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
+# Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 # 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -79,43 +79,37 @@ else
 $(error AARCH must be set to 32 or 64)
 endif
 
-ifneq ($(strip $(STDLIB_SUPPORT)),0)
-MAKE_VERSION_MAJOR := $(firstword $(subst ., ,$(MAKE_VERSION)))
-ifneq ($(filter 0 1 2 3,$(MAKE_VERSION_MAJOR)),)
-$(error STDLIB_SUPPORT > 0 requires GNU make 4.0 or newer)
-endif
-endif
-
 ifeq ($(strip $(STDLIB_SUPPORT)),3)
-# LIBC      != $(CPP) $(ARCH) -print-file-name=libc.a
-LIBC      != $(CPP) -marm -print-file-name=libc.a
+LIBC != "$(shell $(CPP) $(ARCH) -print-file-name=libc.a)"
+#LIBC != $(CPP) -marm -print-file-name=libc.a
 EXTRALIBS += $(LIBC)
-# LIBSTDCPP != $(CPP) $(ARCH) -print-file-name=libstdc++.a
-LIBSTDCPP != $(CPP) -marm -print-file-name=libstdc++.a
+LIBSTDCPP != "$(shell $(CPP) $(ARCH) -print-file-name=libstdc++.a)"
+#LIBSTDCPP != $(CPP) -marm -print-file-name=libstdc++.a
 EXTRALIBS += $(LIBSTDCPP)
-# LIBGCC_EH != $(CPP) $(ARCH) -print-file-name=libgcc_eh.a
-LIBGCC_EH != $(CPP) -marm -print-file-name=libgcc_eh.a
-ifneq ($(strip $(LIBGCC_EH)),libgcc_eh.a)
+LIBGCC_EH != "$(shell $(CPP) $(ARCH) -print-file-name=libgcc_eh.a)"
+#LIBGCC_EH != $(CPP) -marm -print-file-name=libgcc_eh.a
+ifneq ($(strip $(LIBGCC_EH)),"libgcc_eh.a")
 EXTRALIBS += $(LIBGCC_EH)
 endif
 ifeq ($(strip $(AARCH)),64)
-CRTBEGIN != $(CPP) $(ARCH) -print-file-name=crtbegin.o
-CRTEND   != $(CPP) $(ARCH) -print-file-name=crtend.o
+CRTBEGIN = "$(shell $(CPP) $(ARCH) -print-file-name=crtbegin.o)"
+CRTEND   = "$(shell $(CPP) $(ARCH) -print-file-name=crtend.o)"
 endif
 else
-CPPFLAGS  += -fno-exceptions -fno-rtti # -nostdinc++
+#CPPFLAGS  += -fno-exceptions -fno-rtti -nostdinc++
+CPPFLAGS  += -fno-exceptions -fno-rtti
 endif
 
 ifeq ($(strip $(STDLIB_SUPPORT)),0)
-CFLAGS	  += # -nostdinc
+#CFLAGS	  += -nostdinc
 else
-LIBGCC	  != $(CPP) $(ARCH) -print-file-name=libgcc.a
+LIBGCC	  = "$(shell $(CPP) $(ARCH) -print-file-name=libgcc.a)"
 EXTRALIBS += $(LIBGCC)
 endif
 
 ifeq ($(strip $(STDLIB_SUPPORT)),1)
-LIBM	  != $(CPP) $(ARCH) -print-file-name=libm.a
-ifneq ($(strip $(LIBM)),libm.a)
+LIBM	  = "$(shell $(CPP) $(ARCH) -print-file-name=libm.a)"
+ifneq ($(strip $(LIBM)),"libm.a")
 EXTRALIBS += $(LIBM)
 endif
 endif
@@ -126,6 +120,7 @@ LDFLAGS	+= --gc-sections
 endif
 
 OPTIMIZE ?= -O2
+STANDARD ?= -std=c++14 -Wno-aligned-new
 
 INCLUDE	+= -I $(CIRCLEHOME)/include -I $(CIRCLEHOME)/addon -I $(CIRCLEHOME)/app/lib \
 	   -I $(CIRCLEHOME)/addon/vc4 -I $(CIRCLEHOME)/addon/vc4/interface/khronos/include
@@ -133,9 +128,8 @@ DEFINE	+= -D__circle__ -DRASPPI=$(RASPPI) -DSTDLIB_SUPPORT=$(STDLIB_SUPPORT) \
 	   -D__VCCOREVER__=0x04000000 -U__unix__ -U__linux__ #-DNDEBUG
 
 AFLAGS	+= $(ARCH) $(DEFINE) $(INCLUDE) $(OPTIMIZE)
-CFLAGS	+= $(ARCH) -fsigned-char -ffreestanding $(DEFINE) $(INCLUDE) $(OPTIMIZE) -g
-CPPFLAGS+= $(CFLAGS) -std=c++14
-# LDFLAGS	+= -Wl,--section-start=.init=$(LOADADDR)
+CFLAGS	+= $(ARCH) -Wall -fsigned-char -ffreestanding $(DEFINE) $(INCLUDE) $(OPTIMIZE) -g
+CPPFLAGS+= $(CFLAGS) $(STANDARD)
 LDFLAGS	+= --section-start=.init=$(LOADADDR)
 
 ifeq ($(strip $(CHECK_DEPS)),1)
@@ -176,12 +170,18 @@ $(TARGET).img: $(OBJS) $(LIBS) $(CIRCLEHOME)/circle.ld
 	@wc -c < $(TARGET).img
 
 clean:
-	rm -f *.d *.o *.a *.elf *.lst *.img *.hex *.cir *~ $(EXTRACLEAN) ../src/*.o ../src/*.d
+	@echo "  CLEAN " `pwd`
+	@rm -f *.d *.o *.a *.elf *.lst *.img *.hex *.cir *.map *~ $(EXTRACLEAN)  ../src/*.o ../src/*.d
 
 ifneq ($(strip $(SDCARD)),)
 install: $(TARGET).img
 	cp $(TARGET).img $(SDCARD)
 	sync
+endif
+
+ifneq ($(strip $(TFTPHOST)),)
+tftpboot: $(TARGET).img
+	tftp -m binary $(TFTPHOST) -c put $(TARGET).img
 endif
 
 #
@@ -197,11 +197,48 @@ $(TARGET).hex: $(TARGET).img
 	@echo "  COPY  $(TARGET).hex"
 	@$(PREFIX)objcopy $(TARGET).elf -O ihex $(TARGET).hex
 
+# Command line to run node and python.
+# Including the '.exe' forces WSL to run the Windows host version
+# of these commands.  If putty and node are available on the windows
+# machine we can get around WSL's lack of serial port support
+ifeq ($(strip $(WSL_DISTRO_NAME)),)
+NODE=node
+PUTTY=putty
+PUTTYSERIALPORT=$(SERIALPORT)
+else
+NODE=node.exe
+PUTTY=putty.exe
+PUTTYSERIALPORT=$(subst /dev/ttyS,COM,$(SERIALPORT))		# Remap to windows name
+endif
+
+ifeq ($(strip $(USEFLASHY)),)
+
+# Flash with python
 flash: $(TARGET).hex
 ifneq ($(strip $(REBOOTMAGIC)),)
 	python3 $(CIRCLEHOME)/tools/reboottool.py $(REBOOTMAGIC) $(SERIALPORT) $(USERBAUD)
 endif
 	python3 $(CIRCLEHOME)/tools/flasher.py $(TARGET).hex $(SERIALPORT) $(FLASHBAUD)
 
+else
+
+# Flash with flashy
+flash: $(TARGET).hex
+	$(NODE) $(CIRCLEHOME)/tools/flashy/flashy.js \
+		$(SERIALPORT) \
+		--flashBaud:$(FLASHBAUD) \
+		--userBaud:$(USERBAUD) \
+		--reboot:$(REBOOTMAGIC) \
+		$(FLASHYFLAGS) \
+		$(TARGET).hex
+
+endif
+
+# Monitor in putty
 monitor:
-	putty -serial $(SERIALPORT) -sercfg $(USERBAUD)
+	$(PUTTY) -serial $(PUTTYSERIALPORT) -sercfg $(USERBAUD)
+
+# Monitor in terminal (Linux only)
+cat:
+	stty -F $(SERIALPORT) $(USERBAUD) cs8 -cstopb -parenb -icrnl
+	cat $(SERIALPORT)

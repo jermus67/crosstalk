@@ -7,7 +7,7 @@
 //	Licensed under GPL-2.0
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2019  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2019-2021  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@
 #include <circle/pci_regs.h>
 #include <circle/logger.h>
 #include <circle/sysconfig.h>
+#include <circle/machineinfo.h>
 #include <circle/util.h>
 #include <circle/debug.h>
 #include <assert.h>
@@ -233,6 +234,8 @@ static const int pcie_offsets[] = {
 
 #define lower_32_bits(v)	((v) & 0xFFFFFFFFU)
 #define upper_32_bits(v)	((v) >> 32)
+
+u64 CBcmPCIeHostBridge::s_nDMAAddress = 0;
 
 static const char FromPCIeHost[] = "pcie";
 
@@ -547,6 +550,7 @@ int CBcmPCIeHostBridge::enable_device (u32 nClassCode, unsigned nSlot, unsigned 
 					    | PCI_BASE_ADDRESS_MEM_TYPE_64);
 	write32 (conf + PCI_BASE_ADDRESS_1, upper_32_bits (MEM_PCIE_RANGE_PCIE_START));
 
+#if 0
 	uintptr msi_conf = find_pci_capability (conf, PCI_CAP_ID_MSI);
 	if (!msi_conf)
 		return -1;
@@ -559,12 +563,14 @@ int CBcmPCIeHostBridge::enable_device (u32 nClassCode, unsigned nSlot, unsigned 
 	write8 (msi_conf + PCI_MSI_FLAGS,   PCI_MSI_FLAGS_ENABLE
 					  | PCI_MSI_FLAGS_64BIT
 					  | uchQueueSize << 4);
+#endif
 
 	write16 (conf + PCI_COMMAND,   PCI_COMMAND_MEMORY
 				     | PCI_COMMAND_MASTER
 				     | PCI_COMMAND_PARITY
 				     | PCI_COMMAND_SERR
-				     | PCI_COMMAND_INTX_DISABLE);
+				     //| PCI_COMMAND_INTX_DISABLE
+		);
 
 	return 0;
 }
@@ -586,11 +592,15 @@ int CBcmPCIeHostBridge::pcie_set_dma_ranges(void)
 {
 	assert (m_num_dma_ranges == 0);
 
-	m_dma_ranges[0].pcie_addr = MEM_PCIE_DMA_RANGE_PCIE_START;
-	m_dma_ranges[0].cpu_addr = MEM_PCIE_DMA_RANGE_START;
-	m_dma_ranges[0].size = MEM_PCIE_DMA_RANGE_SIZE;
+	TMemoryWindow DMAMemory = CMachineInfo::Get ()->GetPCIeDMAMemory ();
+
+	m_dma_ranges[0].pcie_addr = DMAMemory.BusAddress;
+	m_dma_ranges[0].cpu_addr = DMAMemory.CPUAddress;
+	m_dma_ranges[0].size = DMAMemory.Size;
 
 	m_num_dma_ranges = 1;
+
+	s_nDMAAddress = DMAMemory.BusAddress;
 
 	return 0;
 }

@@ -1,8 +1,25 @@
 //
 // uguicpp.cpp
 //
+// Circle - A C++ bare metal environment for Raspberry Pi
+// Copyright (C) 2016-2021  R. Stange <rsta2@o2online.de>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 #include <ugui/uguicpp.h>
 #include <circle/devicenameservice.h>
+#include <circle/koptions.h>
 #include <circle/timer.h>
 #include <assert.h>
 
@@ -50,12 +67,21 @@ boolean CUGUI::Initialize (void)
 			m_pMouseDevice->ShowCursor (TRUE);
 
 			m_pMouseDevice->RegisterEventHandler (MouseEventStub);
+
+			m_pMouseDevice->RegisterRemovedHandler (MouseRemovedHandler);
 		}
 	}
 
 	m_pTouchScreen = (CTouchScreenDevice *) CDeviceNameService::Get ()->GetDevice ("touch1", FALSE);
 	if (m_pTouchScreen != 0)
 	{
+		const unsigned *pCalibration = CKernelOptions::Get ()->GetTouchScreen ();
+		if (pCalibration != 0)
+		{
+			m_pTouchScreen->SetCalibration (pCalibration, m_pScreen->GetWidth (),
+							m_pScreen->GetHeight ());
+		}
+
 		m_pTouchScreen->RegisterEventHandler (TouchScreenEventStub);
 	}
 
@@ -64,8 +90,27 @@ boolean CUGUI::Initialize (void)
 	return TRUE;
 }
 
-void CUGUI::Update (void)
+void CUGUI::Update (boolean bPlugAndPlayUpdated)
 {
+	if (   bPlugAndPlayUpdated
+	    && m_pMouseDevice == 0)
+	{
+		m_pMouseDevice =
+			(CMouseDevice *) CDeviceNameService::Get ()->GetDevice ("mouse1", FALSE);
+		if (m_pMouseDevice != 0)
+		{
+			assert (m_pScreen != 0);
+			if (m_pMouseDevice->Setup (m_pScreen->GetWidth (), m_pScreen->GetHeight ()))
+			{
+				m_pMouseDevice->ShowCursor (TRUE);
+
+				m_pMouseDevice->RegisterEventHandler (MouseEventStub);
+
+				m_pMouseDevice->RegisterRemovedHandler (MouseRemovedHandler);
+			}
+		}
+	}
+
 	UG_Update ();
 
 	if (m_pMouseDevice != 0)
@@ -92,7 +137,8 @@ void CUGUI::SetPixel (UG_S16 sPosX, UG_S16 sPosY, UG_COLOR Color)
 	s_pThis->m_pScreen->SetPixel ((unsigned) sPosX, (unsigned) sPosY, (TScreenColor) Color);
 }
 
-void CUGUI::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY)
+void CUGUI::MouseEventHandler (TMouseEvent Event, unsigned nButtons,
+			       unsigned nPosX, unsigned nPosY, int nWheelMove)
 {
 	switch (Event)
 	{
@@ -115,10 +161,11 @@ void CUGUI::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nP
 	}
 }
 
-void CUGUI::MouseEventStub (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY)
+void CUGUI::MouseEventStub (TMouseEvent Event, unsigned nButtons,
+			    unsigned nPosX, unsigned nPosY, int nWheelMove)
 {
 	assert (s_pThis != 0);
-	s_pThis->MouseEventHandler (Event, nButtons, nPosX, nPosY);
+	s_pThis->MouseEventHandler (Event, nButtons, nPosX, nPosY, nWheelMove);
 }
 
 void CUGUI::TouchScreenEventHandler (TTouchScreenEvent Event, unsigned nID, unsigned nPosX, unsigned nPosY)
@@ -148,4 +195,10 @@ void CUGUI::TouchScreenEventStub (TTouchScreenEvent Event, unsigned nID, unsigne
 {
 	assert (s_pThis != 0);
 	s_pThis->TouchScreenEventHandler (Event, nID, nPosX, nPosY);
+}
+
+void CUGUI::MouseRemovedHandler (CDevice *pDevice, void *pContext)
+{
+	assert (s_pThis != 0);
+	s_pThis->m_pMouseDevice = 0;
 }

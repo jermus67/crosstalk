@@ -2,7 +2,7 @@
 // usbbluetooth.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2015-2016  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2015-2020  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -25,23 +25,31 @@
 #include <assert.h>
 
 static const char FromBluetooth[] = "btusb";
+static const char DevicePrefix[] = "ubt";
 
-unsigned CUSBBluetoothDevice::s_nDeviceNumber = 1;
+CNumberPool CUSBBluetoothDevice::s_DeviceNumberPool (1);
 
 CUSBBluetoothDevice::CUSBBluetoothDevice (CUSBFunction *pFunction)
 :	CUSBFunction (pFunction),
 	m_pEndpointInterrupt (0),
 	m_pEndpointBulkIn (0),
 	m_pEndpointBulkOut (0),
-	m_pURB (0),
 	m_pEventBuffer (0),
-	m_pEventHandler (0)
+	m_pEventHandler (0),
+	m_nDeviceNumber (0)
 {
 }
 
 CUSBBluetoothDevice::~CUSBBluetoothDevice (void)
 {
 	m_pEventHandler = 0;
+
+	if (m_nDeviceNumber != 0)
+	{
+		CDeviceNameService::Get ()->RemoveDevice (DevicePrefix, m_nDeviceNumber, FALSE);
+
+		s_DeviceNumberPool.FreeNumber (m_nDeviceNumber);
+	}
 
 	delete [] m_pEventBuffer;
 	m_pEventBuffer = 0;
@@ -132,9 +140,10 @@ boolean CUSBBluetoothDevice::Configure (void)
 	m_pEventBuffer = new u8[m_pEndpointInterrupt->GetMaxPacketSize ()];
 	assert (m_pEventBuffer != 0);
 
-	CString DeviceName;
-	DeviceName.Format ("ubt%u", s_nDeviceNumber++);
-	CDeviceNameService::Get ()->AddDevice (DeviceName, this, FALSE);
+	assert (m_nDeviceNumber == 0);
+	m_nDeviceNumber = s_DeviceNumberPool.AllocateNumber (TRUE, FromBluetooth);
+
+	CDeviceNameService::Get ()->AddDevice (DevicePrefix, m_nDeviceNumber, this, FALSE);
 
 	return TRUE;
 }
@@ -163,36 +172,38 @@ boolean CUSBBluetoothDevice::StartRequest (void)
 	assert (m_pEndpointInterrupt != 0);
 	assert (m_pEventBuffer != 0);
 
-	assert (m_pURB == 0);
-	m_pURB = new CUSBRequest (m_pEndpointInterrupt, m_pEventBuffer,
-				  m_pEndpointInterrupt->GetMaxPacketSize ());
-	assert (m_pURB != 0);
+	CUSBRequest *pURB = new CUSBRequest (m_pEndpointInterrupt, m_pEventBuffer,
+					     m_pEndpointInterrupt->GetMaxPacketSize ());
+	assert (pURB != 0);
 
-	m_pURB->SetCompletionRoutine (CompletionStub, 0, this);
+	pURB->SetCompletionRoutine (CompletionStub, 0, this);
 	
-	return GetHost ()->SubmitAsyncRequest (m_pURB);
+	return GetHost ()->SubmitAsyncRequest (pURB);
 }
 
 void CUSBBluetoothDevice::CompletionRoutine (CUSBRequest *pURB)
 {
 	assert (pURB != 0);
-	assert (m_pURB == pURB);
-	assert (m_pEventBuffer != 0);
+
+	boolean bRestart = TRUE;
 
 	if (pURB->GetStatus () != 0)
 	{
 		assert (m_pEventHandler != 0);
+		assert (m_pEventBuffer != 0);
 		(*m_pEventHandler) (m_pEventBuffer, pURB->GetResultLength ());
 	}
 	else
 	{
 		CLogger::Get ()->Write (FromBluetooth, LogWarning, "Request failed");
+
+		bRestart = FALSE;
 	}
 
-	delete m_pURB;
-	m_pURB = 0;
+	delete pURB;
 
-	if (!StartRequest ())
+	if (   bRestart
+	    && !StartRequest ())
 	{
 		CLogger::Get ()->Write (FromBluetooth, LogError, "Cannot restart request");
 	}

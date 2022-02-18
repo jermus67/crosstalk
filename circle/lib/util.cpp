@@ -51,8 +51,6 @@ void *memset (void *pBuffer, int nValue, size_t nLength)
 	return pBuffer;
 }
 
-#if STDLIB_SUPPORT <= 1
-
 void *memmove (void *pDest, const void *pSrc, size_t nLength)
 {
 	char *pchDest = (char *) pDest;
@@ -74,6 +72,8 @@ void *memmove (void *pDest, const void *pSrc, size_t nLength)
 
 	return memcpy (pDest, pSrc, nLength);
 }
+
+#if STDLIB_SUPPORT <= 1
 
 int memcmp (const void *pBuffer1, const void *pBuffer2, size_t nLength)
 {
@@ -718,6 +718,23 @@ u32 bswap32 (u32 ulValue)
 		| ((ulValue & 0x0000FF00) << 8)
 		| ((ulValue & 0x00FF0000) >> 8)
 		| ((ulValue & 0xFF000000) >> 24);
+}
+
+#endif
+
+#if !defined (__GNUC__) || (AARCH == 32 && STDLIB_SUPPORT == 0)
+
+int parity32 (unsigned nValue)
+{
+	int nResult = 0;
+
+	while (nValue != 0)
+	{
+		nResult ^= (nValue & 1);
+		nValue >>= 1;
+	}
+
+	return nResult;
 }
 
 #endif

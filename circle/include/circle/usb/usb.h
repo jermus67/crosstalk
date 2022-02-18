@@ -2,7 +2,7 @@
 // usb.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2019  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -48,6 +48,21 @@ enum TUSBSpeed
 	USBSpeedUnknown
 };
 
+// Errors
+enum TUSBError
+{
+	USBErrorStall,
+	USBErrorTransaction,
+	USBErrorBabble,
+	USBErrorFrameOverrun,
+	USBErrorDataToggle,
+	USBErrorHostBus,
+	USBErrorSplit,
+	USBErrorTimeout,
+	USBErrorAborted,
+	USBErrorUnknown
+};
+
 // Setup Data
 struct TSetupData
 {
@@ -69,6 +84,7 @@ PACKED;
 
 #define REQUEST_TO_DEVICE		0
 #define REQUEST_TO_INTERFACE		1
+#define REQUEST_TO_ENDPOINT		2
 #define REQUEST_TO_OTHER		3
 
 // Standard Request Codes
@@ -79,6 +95,9 @@ PACKED;
 #define GET_DESCRIPTOR			6
 #define SET_CONFIGURATION		9
 #define SET_INTERFACE			11
+
+// Standard Feature Selectors
+#define ENDPOINT_HALT			0
 
 // Descriptor Types
 #define DESCRIPTOR_DEVICE		1

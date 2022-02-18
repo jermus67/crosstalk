@@ -2,7 +2,7 @@
 // serial.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -208,6 +208,8 @@ CSerialDevice::~CSerialDevice (void)
 		return;
 	}
 
+	CDeviceNameService::Get ()->RemoveDevice ("ttyS", m_nDevice+1, FALSE);
+
 	// remove device from interrupt handling
 	s_nInterruptDeviceMask &= ~(1 << m_nDevice);
 	DataSyncBarrier ();
@@ -242,7 +244,8 @@ CSerialDevice::~CSerialDevice (void)
 	m_bValid = FALSE;
 }
 
-boolean CSerialDevice::Initialize (unsigned nBaudrate)
+boolean CSerialDevice::Initialize (unsigned nBaudrate,
+				   unsigned nDataBits, unsigned nStopBits, TParity Parity)
 {
 	if (!m_bValid)
 	{
@@ -303,11 +306,49 @@ boolean CSerialDevice::Initialize (unsigned nBaudrate)
 	write32 (ARM_UART_IBRD, nIntDiv);
 	write32 (ARM_UART_FBRD, nFractDiv);
 
+	// line parameters
+	u32 nLCRH = LCRH_FEN_MASK;
+	switch (nDataBits)
+	{
+	case 5:		nLCRH |= LCRH_WLEN5_MASK;	break;
+	case 6:		nLCRH |= LCRH_WLEN6_MASK;	break;
+	case 7:		nLCRH |= LCRH_WLEN7_MASK;	break;
+	case 8:		nLCRH |= LCRH_WLEN8_MASK;	break;
+
+	default:
+		assert (0);
+		break;
+	}
+
+	assert (1 <= nStopBits && nStopBits <= 2);
+	if (nStopBits == 2)
+	{
+		nLCRH |= LCRH_STP2_MASK;
+	}
+
+	switch (Parity)
+	{
+	case ParityNone:
+		break;
+
+	case ParityOdd:
+		nLCRH |= LCRH_PEN_MASK;
+		break;
+
+	case ParityEven:
+		nLCRH |= LCRH_PEN_MASK | LCRH_EPS_MASK;
+		break;
+
+	default:
+		assert (0);
+		break;
+	}
+
 	if (m_pInterruptSystem != 0)
 	{
 		write32 (ARM_UART_IFLS,   IFLS_IFSEL_1_4 << IFLS_TXIFSEL_SHIFT
 					| IFLS_IFSEL_1_4 << IFLS_RXIFSEL_SHIFT);
-		write32 (ARM_UART_LCRH, LCRH_WLEN8_MASK | LCRH_FEN_MASK);		// 8N1
+		write32 (ARM_UART_LCRH, nLCRH);
 		write32 (ARM_UART_IMSC, INT_RX | INT_RT | INT_OE);
 
 		// add device to interrupt handling
@@ -316,14 +357,14 @@ boolean CSerialDevice::Initialize (unsigned nBaudrate)
 	}
 	else
 	{
-		write32 (ARM_UART_LCRH, LCRH_WLEN8_MASK);	// 8N1
+		write32 (ARM_UART_LCRH, nLCRH);
 	}
 
 	write32 (ARM_UART_CR, CR_UART_EN_MASK | CR_TXE_MASK | CR_RXE_MASK);
 
 	PeripheralExit ();
 
-	CDeviceNameService::Get ()->AddDevice ("ttyS1", this, FALSE);
+	CDeviceNameService::Get ()->AddDevice ("ttyS", m_nDevice+1, this, FALSE);
 
 	return TRUE;
 }
@@ -331,6 +372,14 @@ boolean CSerialDevice::Initialize (unsigned nBaudrate)
 int CSerialDevice::Write (const void *pBuffer, size_t nCount)
 {
 	assert (m_bValid);
+
+#ifdef REALTIME
+	// cannot write from IRQ_LEVEL to prevent deadlock, just ignore it
+	if (CurrentExecutionLevel () > TASK_LEVEL)
+	{
+		return nCount;
+	}
+#endif
 
 	m_LineSpinLock.Acquire ();
 
@@ -458,6 +507,12 @@ int CSerialDevice::Read (void *pBuffer, size_t nCount)
 			else if (nDR & DR_FE_MASK)
 			{
 				nResult = -SERIAL_ERROR_FRAMING;
+
+				break;
+			}
+			else if (nDR & DR_PE_MASK)
+			{
+				nResult = -SERIAL_ERROR_PARITY;
 
 				break;
 			}
@@ -643,6 +698,13 @@ void CSerialDevice::InterruptHandler (void)
 			if (m_nRxStatus == 0)
 			{
 				m_nRxStatus = -SERIAL_ERROR_FRAMING;
+			}
+		}
+		else if (nDR & DR_PE_MASK)
+		{
+			if (m_nRxStatus == 0)
+			{
+				m_nRxStatus = -SERIAL_ERROR_PARITY;
 			}
 		}
 

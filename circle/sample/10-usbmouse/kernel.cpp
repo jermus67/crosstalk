@@ -2,7 +2,7 @@
 // kernel.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2018  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,6 +20,51 @@
 #include "kernel.h"
 #include <assert.h>
 
+#if DEPTH == 8
+
+#define NUM_COLORS	3
+
+TScreenColor CKernel::s_Colors[NUM_COLORS] =
+{
+	HIGH_COLOR,
+	HALF_COLOR,
+	NORMAL_COLOR
+};
+
+#elif DEPTH == 16
+
+#define NUM_COLORS	7
+
+TScreenColor CKernel::s_Colors[NUM_COLORS] =
+{
+	COLOR16 (31, 0, 0),
+	COLOR16 (0, 31, 0),
+	COLOR16 (0, 0, 31),
+	COLOR16 (31, 31, 0),
+	COLOR16 (0, 31, 31),
+	COLOR16 (31, 0, 31),
+	COLOR16 (31, 31, 31)
+};
+
+#elif DEPTH == 32
+
+#define NUM_COLORS	7
+
+TScreenColor CKernel::s_Colors[NUM_COLORS] =
+{
+	COLOR32 (255U, 0, 0, 255U),
+	COLOR32 (0, 255U, 0, 255U),
+	COLOR32 (0, 0, 255U, 255U),
+	COLOR32 (255U, 255U, 0, 255U),
+	COLOR32 (0, 255U, 255U, 255U),
+	COLOR32 (255U, 0, 255U, 255U),
+	COLOR32 (255U, 255U, 255U, 255U)
+};
+
+#else
+	#error DEPTH must be 8, 16 or 32
+#endif
+
 static const char ClearScreen[] = "\x1b[H\x1b[J\x1b[?25l";
 
 static const char FromKernel[] = "kernel";
@@ -30,9 +75,12 @@ CKernel::CKernel (void)
 :	m_Screen (m_Options.GetWidth (), m_Options.GetHeight ()),
 	m_Timer (&m_Interrupt),
 	m_Logger (m_Options.GetLogLevel (), &m_Timer),
-	m_USBHCI (&m_Interrupt, &m_Timer),
+	m_USBHCI (&m_Interrupt, &m_Timer, TRUE),		// TRUE: enable plug-and-play
+	m_pMouse (0),
 	m_nPosX (0),
 	m_nPosY (0),
+	m_nColorIndex (0),
+	m_Color (s_Colors[m_nColorIndex]),
 	m_ShutdownMode (ShutdownNone)
 {
 	s_pThis = this;
@@ -92,30 +140,47 @@ TShutdownMode CKernel::Run (void)
 {
 	m_Logger.Write (FromKernel, LogNotice, "Compile time: " __DATE__ " " __TIME__);
 
-	CMouseDevice *pMouse = (CMouseDevice *) m_DeviceNameService.GetDevice ("mouse1", FALSE);
-	if (pMouse == 0)
-	{
-		m_Logger.Write (FromKernel, LogPanic, "Mouse not found");
-	}
-
-	m_Screen.Write (ClearScreen, sizeof ClearScreen-1);
-
-	if (!pMouse->Setup (m_Screen.GetWidth (), m_Screen.GetHeight ()))
-	{
-		m_Logger.Write (FromKernel, LogPanic, "Cannot setup mouse");
-	}
-
-	m_nPosX = m_Screen.GetWidth () / 2;
-	m_nPosY = m_Screen.GetHeight () / 2;
-
-	pMouse->SetCursor (m_nPosX, m_nPosY);
-	pMouse->ShowCursor (TRUE);
-
-	pMouse->RegisterEventHandler (MouseEventStub);
+	m_Logger.Write (FromKernel, LogNotice, "Please attach an USB mouse, if not already done!");
 
 	for (unsigned nCount = 0; m_ShutdownMode == ShutdownNone; nCount++)
 	{
-		pMouse->UpdateCursor ();
+		// This must be called from TASK_LEVEL to update the tree of connected USB devices.
+		boolean bUpdated = m_USBHCI.UpdatePlugAndPlay ();
+
+		if (   bUpdated
+		    && m_pMouse == 0)
+		{
+			m_pMouse = (CMouseDevice *) m_DeviceNameService.GetDevice ("mouse1", FALSE);
+			if (m_pMouse != 0)
+			{
+				m_pMouse->RegisterRemovedHandler (MouseRemovedHandler);
+
+				m_Logger.Write (FromKernel, LogNotice, "USB mouse has %d buttons",
+						m_pMouse->GetButtonCount());
+				m_Logger.Write (FromKernel, LogNotice, "USB mouse has %s wheel",
+						m_pMouse->HasWheel() ? "a" : "no");
+
+				m_Screen.Write (ClearScreen, sizeof ClearScreen-1);
+
+				if (!m_pMouse->Setup (m_Screen.GetWidth (), m_Screen.GetHeight ()))
+				{
+					m_Logger.Write (FromKernel, LogPanic, "Cannot setup mouse");
+				}
+
+				m_nPosX = m_Screen.GetWidth () / 2;
+				m_nPosY = m_Screen.GetHeight () / 2;
+
+				m_pMouse->SetCursor (m_nPosX, m_nPosY);
+				m_pMouse->ShowCursor (TRUE);
+
+				m_pMouse->RegisterEventHandler (MouseEventStub);
+			}
+		}
+
+		if (m_pMouse != 0)
+		{
+			m_pMouse->UpdateCursor ();
+		}
 
 		m_Screen.Rotor (0, nCount);
 	}
@@ -123,7 +188,7 @@ TShutdownMode CKernel::Run (void)
 	return m_ShutdownMode;
 }
 
-void CKernel::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY)
+void CKernel::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY, int nWheelMove)
 {
 	switch (Event)
 	{
@@ -131,7 +196,7 @@ void CKernel::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned 
 		if (nButtons & (MOUSE_BUTTON_LEFT | MOUSE_BUTTON_RIGHT))
 		{
 			DrawLine (m_nPosX, m_nPosY, nPosX, nPosY,
-				  nButtons & MOUSE_BUTTON_LEFT ? NORMAL_COLOR : HIGH_COLOR);
+				  nButtons & MOUSE_BUTTON_LEFT ? NORMAL_COLOR : m_Color);
 		}
 
 		m_nPosX = nPosX;
@@ -145,15 +210,29 @@ void CKernel::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned 
 		}
 		break;
 
+	case MouseEventMouseWheel:
+		m_nColorIndex += nWheelMove;
+		if (m_nColorIndex < 0)
+		{
+			m_nColorIndex = 0;
+		}
+		else if (m_nColorIndex >= NUM_COLORS)
+		{
+			m_nColorIndex = NUM_COLORS-1;
+		}
+
+		m_Color = s_Colors[m_nColorIndex];
+		break;
+
 	default:
 		break;
 	}
 }
 
-void CKernel::MouseEventStub (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY)
+void CKernel::MouseEventStub (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY, int nWheelMove)
 {
 	assert (s_pThis != 0);
-	s_pThis->MouseEventHandler (Event, nButtons, nPosX, nPosY);
+	s_pThis->MouseEventHandler (Event, nButtons, nPosX, nPosY, nWheelMove);
 }
 
 void CKernel::DrawLine (int nPosX1, int nPosY1, int nPosX2, int nPosY2, TScreenColor Color)
@@ -192,4 +271,18 @@ void CKernel::DrawLine (int nPosX1, int nPosY1, int nPosX2, int nPosY2, TScreenC
 			nPosY1 += nSignY;
 		}
 	}
+}
+
+void CKernel::MouseRemovedHandler (CDevice *pDevice, void *pContext)
+{
+	assert (s_pThis != 0);
+
+	static const char ClearScreen[] = "\x1b[H\x1b[J\x1b[?25h";
+	s_pThis->m_Screen.Write (ClearScreen, sizeof ClearScreen-1);
+
+	CLogger::Get ()->Write (FromKernel, LogDebug, "Mouse removed");
+
+	s_pThis->m_pMouse = 0;
+
+	CLogger::Get ()->Write (FromKernel, LogNotice, "Please attach an USB mouse!");
 }

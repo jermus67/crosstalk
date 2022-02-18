@@ -2,7 +2,7 @@
 // machineinfo.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2016-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2016-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 #define _circle_machineinfo_h
 
 #include <circle/bcmpropertytags.h>
+#include <circle/devicetreeblob.h>
 #include <circle/gpiopin.h>
 #include <circle/macros.h>
 #include <circle/types.h>
@@ -35,6 +36,7 @@ enum TMachineModel
 	MachineModelBPlus,
 	MachineModelZero,
 	MachineModelZeroW,
+	MachineModelZero2W,
 	MachineModel2B,
 	MachineModel3B,
 	MachineModel3APlus,
@@ -43,6 +45,8 @@ enum TMachineModel
 	MachineModelCM3,
 	MachineModelCM3Plus,
 	MachineModel4B,
+	MachineModel400,
+	MachineModelCM4,
 	MachineModelUnknown
 };
 
@@ -59,6 +63,13 @@ enum TDeviceId
 {
 	DeviceI2CMaster,
 	DeviceUnkown
+};
+
+struct TMemoryWindow
+{
+	u64	BusAddress;
+	u64	CPUAddress;
+	u64	Size;
 };
 
 class CMachineInfo
@@ -100,18 +111,30 @@ public:
 
 	// DMA channel resource management
 #if RASPPI <= 3
-#define DMA_CHANNEL_MAX		12			// channels 0-12 are supported
+#define DMA_CHANNEL_MAX		11			// channels 0-11 are supported
 #else
-#define DMA_CHANNEL_MAX		7			// TODO: channels 0-7 are supported
+#define DMA_CHANNEL_MAX		7			// legacy channels 0-7 are supported
+#define DMA_CHANNEL_EXT_MIN	11			// DMA4 channels 11-14 are supported
+#define DMA_CHANNEL_EXT_MAX	14
 #endif
 #define DMA_CHANNEL__MASK	0x0F			// explicit channel number
 #define DMA_CHANNEL_NONE	0x80			// returned if no channel available
 #define DMA_CHANNEL_NORMAL	0x81			// normal DMA engine requested
 #define DMA_CHANNEL_LITE	0x82			// lite (or normal) DMA engine requested
-	// nChannel must be DMA_CHANNEL_NORMAL, DMA_CHANNEL_LITE or an explicit channel number
+#if RASPPI >= 4
+#define DMA_CHANNEL_EXTENDED	0x83			// "large address" DMA4 engine requested
+#endif
+	// nChannel must be DMA_CHANNEL_NORMAL, _LITE, _EXTENDED or an explicit channel number
 	// returns the allocated channel number or DMA_CHANNEL_NONE on failure
 	unsigned AllocateDMAChannel (unsigned nChannel);
 	void FreeDMAChannel (unsigned nChannel);
+
+#if RASPPI >= 4
+	// Devicetree blob handling
+	void FetchDTB (void);
+
+	TMemoryWindow GetPCIeDMAMemory (void) const;
+#endif
 
 	static CMachineInfo *Get (void);
 
@@ -124,6 +147,10 @@ private:
 	unsigned	m_nRAMSize;
 
 	u16		m_usDMAChannelMap;		// channel bit set if channel is free
+
+#if RASPPI >= 4
+	CDeviceTreeBlob	*m_pDTB;
+#endif
 
 	static CMachineInfo *s_pThis;
 };

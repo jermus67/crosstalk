@@ -2,7 +2,7 @@
 // bcmpropertytags.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -43,6 +43,9 @@
 #define PROPTAG_GET_TURBO		0x00030009
 #define PROPTAG_GET_MAX_TEMPERATURE	0x0003000A
 #define PROPTAG_GET_EDID_BLOCK		0x00030020
+#define PROPTAG_GET_THROTTLED		0x00030046
+#define PROPTAG_GET_CLOCK_RATE_MEASURED	0x00030047
+#define PROPTAG_NOTIFY_XHCI_RESET	0x00030058
 #define PROPTAG_SET_CLOCK_RATE		0x00038002
 #define PROPTAG_SET_TURBO		0x00038009
 #define PROPTAG_SET_SET_GPIO_STATE	0x00038041
@@ -52,6 +55,7 @@
 #define PROPTAG_GET_PITCH		0x00040008
 #define PROPTAG_GET_TOUCHBUF		0x0004000F
 #define PROPTAG_GET_GPIO_VIRTBUF	0x00040010
+#define PROPTAG_GET_NUM_DISPLAYS	0x00040013
 #define PROPTAG_SET_PHYS_WIDTH_HEIGHT	0x00048003
 #define PROPTAG_SET_VIRT_WIDTH_HEIGHT	0x00048004
 #define PROPTAG_SET_DEPTH		0x00048005
@@ -59,6 +63,7 @@
 #define PROPTAG_SET_PALETTE		0x0004800B
 #define PROPTAG_WAIT_FOR_VSYNC		0x0004800E
 #define PROPTAG_SET_BACKLIGHT		0x0004800F
+#define PROPTAG_SET_DISPLAY_NUM		0x00048013
 #define PROPTAG_SET_TOUCHBUF		0x0004801F
 #define PROPTAG_SET_GPIO_VIRTBUF	0x00048020
 #define PROPTAG_GET_COMMAND_LINE	0x00050001
@@ -164,6 +169,7 @@ struct TPropertyTagClockRate
 	#define CLOCK_ID_ARM		3
 	#define CLOCK_ID_CORE		4
 	#define CLOCK_ID_EMMC2		12
+	#define CLOCK_ID_PIXEL_BVB	14
 	u32		nRate;			// Hz
 }
 PACKED;

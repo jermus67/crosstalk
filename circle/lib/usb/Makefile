@@ -2,7 +2,7 @@
 # Makefile
 #
 # Circle - A C++ bare metal environment for Raspberry Pi
-# Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
+# Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,7 +29,8 @@ OBJS	= lan7800.o smsc951x.o usbbluetooth.o usbcdcethernet.o \
 	  usbgamepad.o usbgamepadps3.o usbgamepadps4.o usbgamepadstandard.o usbgamepadswitchpro.o \
 	  usbgamepadxbox360.o usbgamepadxboxone.o usbhiddevice.o usbhostcontroller.o \
 	  usbkeyboard.o usbmassdevice.o usbmidi.o usbmouse.o usbprinter.o usbrequest.o \
-	  usbstandardhub.o usbstring.o
+	  usbstandardhub.o usbstring.o usbserial.o usbserialch341.o usbserialcp2102.o \
+	  usbserialpl2303.o usbserialft231x.o usbserialcdc.o usbtouchscreen.o
 
 ifneq ($(strip $(RASPPI)),4)
 OBJS	+= dwhcidevice.o dwhciframeschednper.o dwhciframeschednsplit.o dwhciframeschedper.o \

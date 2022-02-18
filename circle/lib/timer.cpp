@@ -2,7 +2,7 @@
 // timer.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -42,8 +42,6 @@ struct TKernelTimer
 	void 		    *m_pContext;
 };
 
-extern "C" void DelayLoop (unsigned nCount);
-
 static const char FromTimer[] = "timer";
 
 const unsigned CTimer::s_nDaysOfMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
@@ -60,10 +58,10 @@ CTimer::CTimer (CInterruptSystem *pInterruptSystem)
 	m_nMinutesDiff (0),
 	m_nMsDelay (200000),
 	m_nusDelay (m_nMsDelay / 1000),
+	m_pUpdateTimeHandler (0),
 	m_nPeriodicHandlers (0)
 {
 	assert (s_pThis == 0);
-
 	s_pThis = this;
 }
 
@@ -182,9 +180,10 @@ int CTimer::GetTimeZone (void) const
 
 boolean CTimer::SetTime (unsigned nTime, boolean bLocal)
 {
+	int nSecondsDiff = m_nMinutesDiff * 60;
+
 	if (!bLocal)
 	{
-		int nSecondsDiff = m_nMinutesDiff * 60;
 		if (    nSecondsDiff < 0
 		    && -nSecondsDiff > (int) nTime)
 		{
@@ -192,6 +191,12 @@ boolean CTimer::SetTime (unsigned nTime, boolean bLocal)
 		}
 
 		nTime += nSecondsDiff;
+	}
+
+	if (   m_pUpdateTimeHandler != 0
+	    && !(*m_pUpdateTimeHandler) (nTime - nSecondsDiff, GetUniversalTime ()))
+	{
+		return FALSE;
 	}
 
 	m_TimeSpinLock.Acquire ();
@@ -492,15 +497,14 @@ void CTimer::InterruptHandler (void)
 #ifndef USE_PHYSICAL_COUNTER
 	PeripheralEntry ();
 
-	//assert (read32 (ARM_SYSTIMER_CS) & (1 << 3));
-	
-	u32 nCompare = read32 (ARM_SYSTIMER_C3) + CLOCKHZ / HZ;
-	write32 (ARM_SYSTIMER_C3, nCompare);
-	if (nCompare < read32 (ARM_SYSTIMER_CLO))			// time may drift
+	u32 nCompare = read32 (ARM_SYSTIMER_C3);
+	do
 	{
-		nCompare = read32 (ARM_SYSTIMER_CLO) + CLOCKHZ / HZ;
+		nCompare += CLOCKHZ / HZ;
+
 		write32 (ARM_SYSTIMER_C3, nCompare);
 	}
+	while ((int) (nCompare - read32 (ARM_SYSTIMER_CLO)) < 2);	// time may drift
 
 	write32 (ARM_SYSTIMER_CS, 1 << 3);
 
@@ -563,6 +567,13 @@ void CTimer::TuneMsDelay (void)
 
 	CLogger::Get ()->Write (FromTimer, LogNotice, "SpeedFactor is %u.%02u",
 				nFactor / 100, nFactor % 100);
+}
+
+void CTimer::RegisterUpdateTimeHandler (TUpdateTimeHandler *pHandler)
+{
+	assert (m_pUpdateTimeHandler == 0);
+	m_pUpdateTimeHandler = pHandler;
+	assert (m_pUpdateTimeHandler != 0);
 }
 
 void CTimer::RegisterPeriodicHandler (TPeriodicTimerHandler *pHandler)

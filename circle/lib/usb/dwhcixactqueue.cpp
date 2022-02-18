@@ -2,7 +2,7 @@
 // dwhcixactqueue.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2017  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2017-2020  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 #include <circle/usb/dwhcixactqueue.h>
+#include <circle/usb/usbrequest.h>
 #include <circle/usb/dwhci.h>
 #include <assert.h>
 
@@ -56,6 +57,75 @@ CDWHCITransactionQueue::CDWHCITransactionQueue (void)
 
 CDWHCITransactionQueue::~CDWHCITransactionQueue (void)
 {
+	Flush ();
+}
+
+void CDWHCITransactionQueue::Flush (void)
+{
+	m_SpinLock.Acquire ();
+
+	TPtrListElement *pElement = m_List.GetFirst ();
+	while (pElement != 0)
+	{
+		TQueueEntry *pEntry = (TQueueEntry *) m_List.GetPtr (pElement);
+		assert (pEntry != 0);
+		assert (pEntry->nMagic == XACT_QUEUE_MAGIC);
+
+		m_List.Remove (pElement);
+
+		assert (pEntry->pStageData != 0);
+		CUSBRequest *pURB = pEntry->pStageData->GetURB ();
+		delete pURB;
+
+		delete pEntry->pStageData;
+
+#ifndef NDEBUG
+		pEntry->nMagic = 0;
+#endif
+		delete pEntry;
+
+		pElement = m_List.GetFirst ();
+	}
+
+	m_SpinLock.Release ();
+}
+
+void CDWHCITransactionQueue::FlushDevice (CUSBDevice *pUSBDevice)
+{
+	assert (pUSBDevice != 0);
+
+	m_SpinLock.Acquire ();
+
+	TPtrListElement *pElement = m_List.GetFirst ();
+	while (pElement != 0)
+	{
+		TQueueEntry *pEntry = (TQueueEntry *) m_List.GetPtr (pElement);
+		assert (pEntry != 0);
+		assert (pEntry->nMagic == XACT_QUEUE_MAGIC);
+
+		TPtrListElement *pNextElement = m_List.GetNext (pElement);
+
+		assert (pEntry->pStageData != 0);
+		if (pEntry->pStageData->GetDevice () == pUSBDevice)
+		{
+			m_List.Remove (pElement);
+
+			assert (pEntry->pStageData != 0);
+			CUSBRequest *pURB = pEntry->pStageData->GetURB ();
+			delete pURB;
+
+			delete pEntry->pStageData;
+
+#ifndef NDEBUG
+			pEntry->nMagic = 0;
+#endif
+			delete pEntry;
+		}
+
+		pElement = pNextElement;
+	}
+
+	m_SpinLock.Release ();
 }
 
 void CDWHCITransactionQueue::Enqueue (CDWHCITransferStageData *pStageData, u16 usFrameNumber)

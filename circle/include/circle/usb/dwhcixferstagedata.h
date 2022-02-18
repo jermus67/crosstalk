@@ -2,7 +2,7 @@
 // dwhcixferstagedata.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2018  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -76,11 +76,14 @@ public:
 
 	// check status after transaction
 	u32 GetTransactionStatus (void) const;
+	TUSBError GetUSBError (void) const;
 	boolean IsStageComplete (void) const;
 	u32 GetResultLen (void) const;
 	boolean IsTimeout (void) const;
+	boolean IsRetryOK (void) const;
 
 	CUSBRequest *GetURB (void) const;
+	CUSBDevice *GetDevice (void) const;
 	CDWHCIFrameScheduler *GetFrameScheduler (void) const;
 
 private:
@@ -107,6 +110,7 @@ private:
 	unsigned	 m_nState;
 	unsigned	 m_nSubState;
 	u32		 m_nTransactionStatus;
+	unsigned	 m_nErrorCount;
 
 	u32		*m_pTempBuffer;
 	void		*m_pBufferPointer;

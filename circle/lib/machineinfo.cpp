@@ -2,7 +2,7 @@
 // machineinfo.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2016-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2016-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include <circle/machineinfo.h>
 #include <circle/gpioclock.h>
 #include <circle/sysconfig.h>
+#include <circle/startup.h>
 #include <assert.h>
 
 static struct
@@ -71,7 +72,10 @@ s_NewInfo[]
 	{13, MachineModel3BPlus,	3},
 	{14, MachineModel3APlus,	3},
 	{16, MachineModelCM3Plus,	3},
-	{17, MachineModel4B,		4}
+	{17, MachineModel4B,		4},
+	{18, MachineModelZero2W,	3},
+	{19, MachineModel400,		4},
+	{20, MachineModelCM4,		4}
 };
 
 static const char *s_MachineName[] =		// must match TMachineModel
@@ -84,6 +88,7 @@ static const char *s_MachineName[] =		// must match TMachineModel
 	"Raspberry Pi Model B+",
 	"Raspberry Pi Zero",
 	"Raspberry Pi Zero W",
+	"Raspberry Pi Zero 2 W",
 	"Raspberry Pi 2 Model B",
 	"Raspberry Pi 3 Model B",
 	"Raspberry Pi 3 Model A+",
@@ -92,6 +97,8 @@ static const char *s_MachineName[] =		// must match TMachineModel
 	"Compute Module 3",
 	"Compute Module 3+",
 	"Raspberry Pi 4 Model B",
+	"Raspberry Pi 400",
+	"Compute Module 4",
 	"Unknown"
 };
 
@@ -114,6 +121,7 @@ static unsigned s_ActLEDInfo[] =		// must match TMachineModel
 	47,				// B+
 	47 | ACTLED_ACTIVE_LOW,		// Zero
 	47 | ACTLED_ACTIVE_LOW,		// Zero W
+	29 | ACTLED_ACTIVE_LOW,		// Zero 2 W
 	47,				// 2B
 	0 | ACTLED_VIRTUAL_PIN,		// 3B
 	29,				// 3A+
@@ -122,6 +130,8 @@ static unsigned s_ActLEDInfo[] =		// must match TMachineModel
 	0 | ACTLED_VIRTUAL_PIN,		// CM3
 	0 | ACTLED_VIRTUAL_PIN,		// CM3+
 	42,				// 4B
+	42,				// 400
+	42,				// CM4
 
 	ACTLED_UNKNOWN			// Unknown
 };
@@ -138,7 +148,8 @@ CMachineInfo::CMachineInfo (void)
 #if RASPPI <= 3
 	m_usDMAChannelMap (0x1F35)	// default mapping
 #else
-	m_usDMAChannelMap (0x71F5)	// default mapping
+	m_usDMAChannelMap (0x71F5),	// default mapping
+	m_pDTB (0)
 #endif
 {
 	if (s_pThis != 0)
@@ -232,6 +243,11 @@ CMachineInfo::~CMachineInfo (void)
 {
 	m_MachineModel = MachineModelUnknown;
 
+#if RASPPI >= 4
+	delete m_pDTB;
+	m_pDTB = 0;
+#endif
+
 	if (s_pThis == this)
 	{
 		s_pThis = 0;
@@ -288,7 +304,15 @@ unsigned CMachineInfo::GetClockRate (u32 nClockId) const
 	CBcmPropertyTags Tags;
 	TPropertyTagClockRate TagClockRate;
 	TagClockRate.nClockId = nClockId;
-	if (Tags.GetTag (PROPTAG_GET_CLOCK_RATE, &TagClockRate, sizeof TagClockRate, 4))
+	if (   Tags.GetTag (PROPTAG_GET_CLOCK_RATE, &TagClockRate, sizeof TagClockRate, 4)
+	    && TagClockRate.nRate != 0)
+	{
+		return TagClockRate.nRate;
+	}
+
+	TagClockRate.nClockId = nClockId;
+	if (   Tags.GetTag (PROPTAG_GET_CLOCK_RATE_MEASURED, &TagClockRate, sizeof TagClockRate, 4)
+	    && TagClockRate.nRate != 0)
 	{
 		return TagClockRate.nRate;
 	}
@@ -299,6 +323,7 @@ unsigned CMachineInfo::GetClockRate (u32 nClockId) const
 	switch (nClockId)
 	{
 	case CLOCK_ID_EMMC:
+	case CLOCK_ID_EMMC2:
 		nResult = 100000000;
 		break;
 
@@ -315,6 +340,9 @@ unsigned CMachineInfo::GetClockRate (u32 nClockId) const
 		{
 			nResult = 300000000;		// TODO
 		}
+		break;
+
+	case CLOCK_ID_PIXEL_BVB:
 		break;
 
 	default:
@@ -334,9 +362,14 @@ unsigned CMachineInfo::GetGPIOPin (TGPIOVirtualPin Pin) const
 	case GPIOPinAudioLeft:
 #ifdef USE_PWM_AUDIO_ON_ZERO
 		if (   m_MachineModel == MachineModelZero
-		    || m_MachineModel == MachineModelZeroW)
+		    || m_MachineModel == MachineModelZeroW
+		    || m_MachineModel == MachineModelZero2W)
 		{
+#ifdef USE_GPIO18_FOR_LEFT_PWM_ON_ZERO
+			return 18;
+#else
 			return 12;
+#endif // USE_GPIO18_FOR_LEFT_PWM_ON_ZERO
 		}
 #endif
 		if (m_MachineModel <= MachineModelBRelease2MB512)
@@ -359,9 +392,14 @@ unsigned CMachineInfo::GetGPIOPin (TGPIOVirtualPin Pin) const
 	case GPIOPinAudioRight:
 #ifdef USE_PWM_AUDIO_ON_ZERO
 		if (   m_MachineModel == MachineModelZero
-		    || m_MachineModel == MachineModelZeroW)
+		    || m_MachineModel == MachineModelZeroW
+		    || m_MachineModel == MachineModelZero2W)
 		{
+#ifdef USE_GPIO19_FOR_RIGHT_PWM_ON_ZERO
+			return 19;
+#else
 			return 13;
+#endif // USE_GPIO19_FOR_RIGHT_PWM_ON_ZERO
 		}
 #endif
 		if (m_MachineModel <= MachineModelBRelease2MB512)
@@ -445,7 +483,8 @@ boolean CMachineInfo::ArePWMChannelsSwapped (void) const
 {
 	return    m_MachineModel >= MachineModelAPlus
 	       && m_MachineModel != MachineModelZero
-	       && m_MachineModel != MachineModelZeroW;
+	       && m_MachineModel != MachineModelZeroW
+	       && m_MachineModel != MachineModelZero2W;
 }
 
 unsigned CMachineInfo::AllocateDMAChannel (unsigned nChannel)
@@ -471,7 +510,15 @@ unsigned CMachineInfo::AllocateDMAChannel (unsigned nChannel)
 	{
 		// arbitrary channel allocation
 		int i = nChannel == DMA_CHANNEL_NORMAL ? 6 : DMA_CHANNEL_MAX;
-		for (; i >= 0; i--)
+		int nMin = 0;
+#if RASPPI >= 4
+		if (nChannel == DMA_CHANNEL_EXTENDED)
+		{
+			i = DMA_CHANNEL_EXT_MAX;
+			nMin = DMA_CHANNEL_EXT_MIN;
+		}
+#endif
+		for (; i >= nMin; i--)
 		{
 			if (m_usDMAChannelMap & (1 << i))
 			{
@@ -499,6 +546,71 @@ void CMachineInfo::FreeDMAChannel (unsigned nChannel)
 	assert (!(m_usDMAChannelMap & (1 << nChannel)));
 	m_usDMAChannelMap |= 1 << nChannel;
 }
+
+#if RASPPI >= 4
+
+void CMachineInfo::FetchDTB (void)
+{
+	const void *pDTB = (const void *) (uintptr) ARM_DTB_PTR32;
+	if (pDTB != 0)
+	{
+		assert (m_pDTB == 0);
+		m_pDTB = new CDeviceTreeBlob (pDTB);
+		assert (m_pDTB != 0);
+
+		ARM_DTB_PTR32 = 0;	// does not work with chain boot, disable it
+	}
+}
+
+TMemoryWindow CMachineInfo::GetPCIeDMAMemory (void) const
+{
+	assert (s_pThis != 0);
+	if (s_pThis != this)
+	{
+		return s_pThis->GetPCIeDMAMemory ();
+	}
+
+	TMemoryWindow Result;
+
+	if (m_pDTB != 0)
+	{
+		const TDeviceTreeNode *pPCIe = m_pDTB->FindNode ("/scb/pcie@7d500000");
+		if (pPCIe != 0)
+		{
+			const TDeviceTreeProperty *pDMA = m_pDTB->FindProperty (pPCIe, "dma-ranges");
+			if (   pDMA != 0
+			    && m_pDTB->GetPropertyValueLength (pDMA) == sizeof (u32)*7)
+			{
+				Result.BusAddress = (u64) m_pDTB->GetPropertyValueWord (pDMA, 1) << 32
+							| m_pDTB->GetPropertyValueWord (pDMA, 2);
+				Result.CPUAddress = (u64) m_pDTB->GetPropertyValueWord (pDMA, 3) << 32
+							| m_pDTB->GetPropertyValueWord (pDMA, 4);
+				Result.Size	  = (u64) m_pDTB->GetPropertyValueWord (pDMA, 5) << 32
+							| m_pDTB->GetPropertyValueWord (pDMA, 6);
+
+				return Result;
+			}
+		}
+	}
+
+	// use default setting, if DTB is not available
+	Result.BusAddress = MEM_PCIE_DMA_RANGE_PCIE_START;
+	Result.CPUAddress = MEM_PCIE_DMA_RANGE_START;
+	Result.Size = (u64) m_nRAMSize * MEGABYTE;
+
+	if (   m_MachineModel != MachineModel4B			// not for BCM2711B0
+	    || m_nModelRevision >= 5)
+	{
+		if (m_nRAMSize >= 4096)
+		{
+			Result.BusAddress = 0x400000000ULL;
+		}
+	}
+
+	return Result;
+}
+
+#endif
 
 CMachineInfo *CMachineInfo::Get (void)
 {

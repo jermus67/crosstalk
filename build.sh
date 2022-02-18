@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Configure GCCHOME to point to your local gcc-arm-non-eabi installation
+
+#export GCCHOME=/usr/local/Cellar/arm-gcc-bin/9-2019-q4-major
+export GCCHOME=/opt/gcc-arm-none-eabi-10.3-2021.10
+
 function clean {
   pushd . > /dev/null 2>&1
 

@@ -2,7 +2,7 @@
 // kernel.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2016  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@
 #ifndef _kernel_h
 #define _kernel_h
 
-#include <circle/memory.h>
 #include <circle/actled.h>
 #include <circle/koptions.h>
 #include <circle/devicenameservice.h>
@@ -33,6 +32,8 @@
 #include <circle/usb/usbhcidevice.h>
 #include <circle/usb/usbgamepad.h>
 #include <circle/types.h>
+
+#define MAX_GAMEPADS	2
 
 enum TShutdownMode
 {
@@ -54,9 +55,10 @@ public:
 private:
 	static void GamePadStatusHandler (unsigned nDeviceIndex, const TGamePadState *pState);
 	
+	static void GamePadRemovedHandler (CDevice *pDevice, void *pContext);
+
 private:
 	// do not change this order
-	CMemorySystem		m_Memory;
 	CActLED			m_ActLED;
 	CKernelOptions		m_Options;
 	CDeviceNameService	m_DeviceNameService;
@@ -67,6 +69,8 @@ private:
 	CTimer			m_Timer;
 	CLogger			m_Logger;
 	CUSBHCIDevice		m_USBHCI;
+
+	CUSBGamePadDevice * volatile m_pGamePad[MAX_GAMEPADS];
 };
 
 #endif

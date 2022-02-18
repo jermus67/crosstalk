@@ -36,10 +36,13 @@ public:
 
 	void Process (void);
 
+	// returns 0, if net device is not available yet
 	const CMACAddress *GetMACAddress (void) const;
 
 	void Send (const void *pBuffer, unsigned nLength);
 	boolean Receive (void *pBuffer, unsigned *pResultLength);
+
+	boolean IsRunning (void) const;			// is net device available?
 
 private:
 	TNetDeviceType m_DeviceType;

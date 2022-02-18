@@ -20,7 +20,6 @@
 #ifndef _kernel_h
 #define _kernel_h
 
-#include <circle/memory.h>
 #include <circle/actled.h>
 #include <circle/koptions.h>
 #include <circle/devicenameservice.h>
@@ -57,13 +56,10 @@ public:
 	TShutdownMode Run (void);
 	
 private:
-	void WaitForReturnKey (void);
-
-	static void KeyPressedHandler (const char *pString);
+	static void StorageRemovedHandler (CDevice *pDevice, void *pContext);
 
 private:
 	// do not change this order
-	CMemorySystem		m_Memory;
 	CActLED			m_ActLED;
 	CKernelOptions		m_Options;
 	CDeviceNameService	m_DeviceNameService;
@@ -75,15 +71,13 @@ private:
 	CLogger			m_Logger;
 	CUSBHCIDevice		m_USBHCI;
 
+	volatile boolean	m_bStorageAttached;
+
 #ifdef USE_FATFS
 	FATFS			m_FileSystem;
 #else
 	CFATFileSystem	       *m_pFileSystem;
 #endif
-
-	volatile char		m_chLastKey;
-
-	static CKernel *s_pThis;
 };
 
 #endif

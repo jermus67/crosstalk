@@ -2,7 +2,7 @@
 // koptions.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -35,12 +35,14 @@ CKernelOptions::CKernelOptions (void)
 	m_nSoundOption (0),
 	m_CPUSpeed (CPUSpeedLow),
 	m_nSoCMaxTemp (60),
+    m_bTouchScreenValid (FALSE)
 	m_CursorType (0),
 	m_nCursorColor (0),
 	m_nBootMode (0)
 {
 	strcpy (m_LogDevice, "tty1");
 	strcpy (m_KeyMap, DEFAULT_KEYMAP);
+	m_USBIgnore[0] = '\0';
 	m_SoundDevice[0] = '\0';
 
 	s_pThis = this;
@@ -117,6 +119,11 @@ CKernelOptions::CKernelOptions (void)
 				m_bUSBFullSpeed = TRUE;
 			}
 		}
+		else if (strcmp (pOption, "usbignore") == 0)
+		{
+			strncpy (m_USBIgnore, pValue, sizeof m_USBIgnore-1);
+			m_USBIgnore[sizeof m_USBIgnore-1] = '\0';
+		}
 		else if (strcmp (pOption, "sounddev") == 0)
 		{
 			strncpy (m_SoundDevice, pValue, sizeof m_SoundDevice-1);
@@ -147,6 +154,10 @@ CKernelOptions::CKernelOptions (void)
 				m_nSoCMaxTemp = nValue;
 			}
 		}
+        else if (strcmp (pOption, "touchscreen") == 0)
+        {
+            m_bTouchScreenValid = GetDecimals (pValue, m_TouchScreen, 4);
+        }
 		else if (strcmp (pOption, "cursortype") == 0)
 		{
 			if (strncmp(pValue, "hw", sizeof "hw") == 0)
@@ -215,6 +226,11 @@ boolean CKernelOptions::GetUSBFullSpeed (void) const
 	return m_bUSBFullSpeed;
 }
 
+const char *CKernelOptions::GetUSBIgnore (void) const
+{
+	return m_USBIgnore;
+}
+
 const char *CKernelOptions::GetSoundDevice (void) const
 {
 	return m_SoundDevice;
@@ -233,6 +249,11 @@ TCPUSpeed CKernelOptions::GetCPUSpeed (void) const
 unsigned CKernelOptions::GetSoCMaxTemp (void) const
 {
 	return m_nSoCMaxTemp;
+}
+
+const unsigned *CKernelOptions::GetTouchScreen (void) const
+{
+	return m_bTouchScreenValid ? m_TouchScreen : nullptr;
 }
 
 unsigned CKernelOptions::GetCursorType (void) const
@@ -340,6 +361,33 @@ unsigned CKernelOptions::GetDecimal (char *pString)
 	}
 
 	return nResult;
+}
+
+boolean CKernelOptions::GetDecimals (char *pString, unsigned *pResult, unsigned nCount)
+{
+	static const char Delim[] = ",";
+
+	char *pSavePtr;
+	while (nCount--)
+	{
+		char *pToken = strtok_r (pString, Delim, &pSavePtr);
+		if (!pToken)
+		{
+			return FALSE;
+		}
+
+		unsigned nValue = GetDecimal (pToken);
+		if (nValue == INVALID_VALUE)
+		{
+			return FALSE;
+		}
+
+		*pResult++ = nValue;
+
+		pString = nullptr;
+	}
+
+	return !strtok_r (nullptr, Delim, &pSavePtr);
 }
 
 unsigned CKernelOptions::GetHex (char *pString)

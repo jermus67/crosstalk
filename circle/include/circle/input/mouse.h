@@ -2,7 +2,7 @@
 // mouse.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2014-2018  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2014-2020  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,17 +22,21 @@
 
 #include <circle/device.h>
 #include <circle/input/mousebehaviour.h>
+#include <circle/numberpool.h>
 #include <circle/types.h>
 
 #define MOUSE_DISPLACEMENT_MIN	-127
 #define MOUSE_DISPLACEMENT_MAX	127
 
-typedef void TMouseStatusHandler (unsigned nButtons, int nDisplacementX, int nDisplacementY);
+typedef void TMouseStatusHandler (unsigned nButtons, int nDisplacementX, int nDisplacementY, int nWheelMove);
 
 class CMouseDevice : public CDevice	/// Generic mouse interface device ("mouse1")
 {
 public:
-	CMouseDevice (void);
+	/// \brief Construct a mouse device instance
+	/// \param nButtons Number of buttons
+	/// \param bHasWheel Wheel presence
+	CMouseDevice (unsigned nButtons, boolean bHasWheel = FALSE);
 	~CMouseDevice (void);
 
 	/// \brief Setup mouse device in cooked mode
@@ -62,9 +66,15 @@ public:
 	/// \param pStatusHandler Pointer to the mouse status handler
 	void RegisterStatusHandler (TMouseStatusHandler *pStatusHandler);
 
+	/// \return Number of supported mouse buttons
+	unsigned GetButtonCount (void) const;
+
+	/// \return Does the mouse support a mouse wheel?
+	boolean HasWheel (void) const;
+
 public:
 	/// \warning Do not call this from application!
-	void ReportHandler (unsigned nButtons, int nDisplacementX, int nDisplacementY);
+	void ReportHandler (unsigned nButtons, int nDisplacementX, int nDisplacementY, int nWheelMove);
 
 private:
 	CMouseBehaviour m_Behaviour;
@@ -72,7 +82,10 @@ private:
 	TMouseStatusHandler *m_pStatusHandler;
 
 	unsigned m_nDeviceNumber;
-	static unsigned s_nDeviceNumber;
+	static CNumberPool s_DeviceNumberPool;
+
+	unsigned m_nButtons;
+	boolean m_bHasWheel;
 };
 
 #endif

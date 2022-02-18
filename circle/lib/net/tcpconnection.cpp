@@ -13,7 +13,7 @@
 //	user timeout
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2015-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2015-2021  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -213,6 +213,10 @@ CTCPConnection::~CTCPConnection (void)
 		StopTimer (nTimer);
 	}
 
+	// ensure no task is waiting any more
+	m_Event.Set ();
+	m_TxEvent.Set ();
+
 	assert (s_nConnections > 0);
 	s_nConnections--;
 }
@@ -395,8 +399,8 @@ int CTCPConnection::Send (const void *pData, unsigned nLength, int nFlags)
 
 	if (!(nFlags & MSG_DONTWAIT))
 	{
-		m_Event.Clear ();
-		m_Event.Wait ();
+		m_TxEvent.Clear ();
+		m_TxEvent.Wait ();
 
 		if (m_nErrno < 0)
 		{
@@ -566,6 +570,14 @@ void CTCPConnection::Process (void)
 		m_RetransmissionQueue.Write (TempBuffer, nLength);
 	}
 
+	// pacing transmit
+	if (   (   m_State == TCPStateEstablished
+		|| m_State == TCPStateCloseWait)
+	    && m_TxQueue.IsEmpty ())
+	{
+		m_TxEvent.Set ();
+	}
+
 	if (m_bRetransmit)
 	{
 #ifdef TCP_DEBUG
@@ -592,8 +604,7 @@ void CTCPConnection::Process (void)
 		m_RetransmissionQueue.Read (TempBuffer, nLength);
 
 		unsigned nFlags = TCP_FLAG_ACK;
-		if (   m_RetransmissionQueue.IsEmpty ()
-		    && m_TxQueue.IsEmpty ())
+		if (m_TxQueue.IsEmpty ())
 		{
 			nFlags |= TCP_FLAG_PUSH;
 		}
@@ -1057,8 +1068,6 @@ int CTCPConnection::PacketReceived (const void	*pPacket,
 
 					// next transmission starts with this count
 					m_nRetransmissionCount = MAX_RETRANSMISSIONS;
-
-					m_Event.Set ();
 				}
 
 				if (   m_State == TCPStateFinWait1
@@ -1224,6 +1233,7 @@ int CTCPConnection::PacketReceived (const void	*pPacket,
 			}
 			break;
 
+		case TCPStateSynReceived:	// this state not in RFC 793
 		case TCPStateCloseWait:
 		case TCPStateClosing:
 		case TCPStateLastAck:

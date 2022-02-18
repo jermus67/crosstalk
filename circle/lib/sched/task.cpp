@@ -2,7 +2,7 @@
 // task.cpp
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2015-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2015-2021  R. Stange <rsta2@o2online.de>
 // 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -22,10 +22,12 @@
 #include <circle/util.h>
 #include <assert.h>
 
-CTask::CTask (unsigned nStackSize)
-:	m_State (TaskStateReady),
+CTask::CTask (unsigned nStackSize, boolean bCreateSuspended)
+:	m_State (bCreateSuspended ? TaskStateNew : TaskStateReady),
+	m_bSuspended (FALSE),
 	m_nStackSize (nStackSize),
-	m_pStack (0)
+	m_pStack (0),
+	m_pWaitListNext (0)
 {
 	for (unsigned i = 0; i < TASK_USER_DATA_SLOTS; i++)
 	{
@@ -46,6 +48,8 @@ CTask::CTask (unsigned nStackSize)
 		InitializeRegs ();
 	}
 
+	m_Name.Format ("@%lp", this);
+
 	CScheduler::Get ()->AddTask (this);
 }
 
@@ -56,6 +60,26 @@ CTask::~CTask (void)
 
 	delete [] m_pStack;
 	m_pStack = 0;
+}
+
+void CTask::Start (void)
+{
+	if (m_State == TaskStateNew)
+	{
+		m_State = TaskStateReady;
+	}
+	else
+	{
+		assert (m_bSuspended);
+		m_bSuspended = FALSE;
+	}
+}
+
+void CTask::Suspend (void)
+{
+	assert (m_State != TaskStateNew);
+	assert (!m_bSuspended);
+	m_bSuspended = TRUE;
 }
 
 void CTask::Run (void)		// dummy method which is never called
@@ -74,7 +98,25 @@ void CTask::Terminate (void)
 
 void CTask::WaitForTermination (void)
 {
+	// Before accessing any of our member variables
+	// make sure this task object hasn't been deleted by 
+	// checking it's still registered with the scheduler
+	if (!CScheduler::Get()->IsValidTask (this))
+	{
+		return;
+	}
+
 	m_Event.Wait ();
+}
+
+void CTask::SetName (const char *pName)
+{
+	m_Name = pName;
+}
+
+const char *CTask::GetName (void) const
+{
+	return m_Name;
 }
 
 void CTask::SetUserData (void *pData, unsigned nSlot)

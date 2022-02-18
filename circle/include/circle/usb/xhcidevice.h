@@ -2,7 +2,7 @@
 // xhcidevice.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2019-2020  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2019-2021  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -32,15 +32,17 @@
 #include <circle/usb/xhcicommandmanager.h>
 #include <circle/usb/xhciroothub.h>
 #include <circle/usb/xhci.h>
+#include <circle/sysconfig.h>
 #include <circle/types.h>
 
 class CXHCIDevice : public CUSBHostController	/// USB host controller interface (xHCI) driver
 {
 public:
-	CXHCIDevice (CInterruptSystem *pInterruptSystem, CTimer *pTimer);
+	CXHCIDevice (CInterruptSystem *pInterruptSystem, CTimer *pTimer,
+		     boolean bPlugAndPlay = FALSE);
 	~CXHCIDevice (void);
 
-	boolean Initialize (void);
+	boolean Initialize (boolean bScanDevices = TRUE);
 
 	void ReScanDevices (void);
 
@@ -63,13 +65,18 @@ public:
 #endif
 
 private:
-	void InterruptHandler (unsigned nVector);
-	static void InterruptStub (unsigned nVector, void *pParam);
+	void InterruptHandler (void);
+	static void InterruptStub (void *pParam);
 
 	boolean HWReset (void);
 
 private:
+	CInterruptSystem *m_pInterruptSystem;
+	boolean m_bInterruptConnected;
+
+#ifndef USE_XHCI_INTERNAL
 	CBcmPCIeHostBridge m_PCIeHostBridge;
+#endif
 
 	CXHCISharedMemAllocator m_SharedMemAllocator;
 

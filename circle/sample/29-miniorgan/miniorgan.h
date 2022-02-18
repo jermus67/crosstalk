@@ -2,7 +2,7 @@
 // miniorgan.h
 //
 // Circle - A C++ bare metal environment for Raspberry Pi
-// Copyright (C) 2017  R. Stange <rsta2@o2online.de>
+// Copyright (C) 2017-2021  R. Stange <rsta2@o2online.de>
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,19 +20,32 @@
 #ifndef _miniorgan_h
 #define _miniorgan_h
 
+// define only one
 //#define USE_I2S
+//#define USE_HDMI
 
 #ifdef USE_I2S
 	#include <circle/i2ssoundbasedevice.h>
 	#define SOUND_CLASS	CI2SSoundBaseDevice
 	#define SAMPLE_RATE	192000
+	#define CHUNK_SIZE	8192
+	#define DAC_I2C_ADDRESS	0		// I2C slave address of the DAC (0 for auto probing)
+#elif defined (USE_HDMI)
+	#include <circle/hdmisoundbasedevice.h>
+	#define SOUND_CLASS	CHDMISoundBaseDevice
+	#define SAMPLE_RATE	48000
+	#define CHUNK_SIZE	(384 * 10)
 #else
 	#include <circle/pwmsoundbasedevice.h>
 	#define SOUND_CLASS	CPWMSoundBaseDevice
 	#define SAMPLE_RATE	48000
+	#define CHUNK_SIZE	2048
 #endif
 
 #include <circle/interrupt.h>
+#include <circle/i2cmaster.h>
+#include <circle/usb/usbmidi.h>
+#include <circle/usb/usbkeyboard.h>
 #include <circle/serial.h>
 #include <circle/types.h>
 
@@ -45,12 +58,12 @@ struct TNoteInfo
 class CMiniOrgan : public SOUND_CLASS
 {
 public:
-	CMiniOrgan (CInterruptSystem *pInterrupt);
+	CMiniOrgan (CInterruptSystem *pInterrupt, CI2CMaster *pI2CMaster);
 	~CMiniOrgan (void);
 
 	boolean Initialize (void);
 
-	void Process (void);
+	void Process (boolean bPlugAndPlayUpdated);
 
 	unsigned GetChunk (u32 *pBuffer, unsigned nChunkSize);
 
@@ -59,7 +72,12 @@ private:
 
 	static void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
 
+	static void USBDeviceRemovedHandler (CDevice *pDevice, void *pContext);
+
 private:
+	CUSBMIDIDevice     * volatile m_pMIDIDevice;
+	CUSBKeyboardDevice * volatile m_pKeyboard;
+
 	CSerialDevice m_Serial;
 	boolean m_bUseSerial;
 	unsigned m_nSerialState;
