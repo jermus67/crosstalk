@@ -25,6 +25,8 @@
 #include <circle/util.h>
 #include <smalltalk.h>
 
+#include<memory>
+
 #define PARTITION       "emmc1-1"
 
 static const char ClearScreen[] = "\x1b[H\x1b[J\x1b[?25l";
@@ -121,19 +123,18 @@ void CKernel::smalltalk (void)
 	vm_options.cycles_per_frame = 1800;
 	vm_options.display_scale = 1;
 
-	VirtualMachine *vm = new VirtualMachine(vm_options, m_Screen);
+    auto vm = std::make_shared<VirtualMachine>(VirtualMachine(vm_options, m_Screen));
 
-        m_Logger.Write (FromKernel, LogDebug, "VM init");
+    m_Logger.Write (FromKernel, LogDebug, "VM init");
 	if (vm->init())
 	{
-                m_Logger.Write (FromKernel, LogDebug, "VM run");
+        m_Logger.Write (FromKernel, LogDebug, "VM run");
 		vm->run();
 	}
 	else
 	{
 		m_Logger.Write (FromKernel, LogError, "VM failed to initialize (invalid/missing directory or snapshot?)");
 	}
-	delete vm;
 }
 
 TShutdownMode CKernel::Run (void)
@@ -173,14 +174,14 @@ TShutdownMode CKernel::Run (void)
 
 	pMouse->RegisterEventHandler (MouseEventStub);
 
-        CLogger::Get ()->Write ("runtime", LogDebug, "SD mount");
+    CLogger::Get ()->Write ("runtime", LogDebug, "SD mount");
 
 	FATFS m_FileSystem;
 
-        if (f_mount (&m_FileSystem, "SD:", 1) != FR_OK)
-        {
-                CLogger::Get ()->Write ("ObjectMemory", LogDebug, "Cannot mount drive: %s", "sd:");
-        }
+    if (f_mount (&m_FileSystem, "SD:", 1) != FR_OK)
+    {
+        CLogger::Get ()->Write ("ObjectMemory", LogDebug, "Cannot mount drive: %s", "sd:");
+    }
 
 	m_Logger.Write (FromKernel, LogDebug, "Starting smalltalk");
 	smalltalk();
@@ -233,7 +234,7 @@ void CKernel::KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned cha
 //        s_pThis->m_Logger.Write (FromKernel, LogNotice, Message);
 }
 
-void CKernel::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY)
+void CKernel::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY, int nWheelMove)
 {
 		m_nPosX = nPosX;
 		m_nPosY = nPosY;
@@ -258,10 +259,10 @@ void CKernel::MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned 
         }
 }
 
-void CKernel::MouseEventStub (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY)
+void CKernel::MouseEventStub (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY,  int nWheelMove)
 {
 	assert (s_pThis != 0);
-	s_pThis->MouseEventHandler (Event, nButtons, nPosX, nPosY);
+	s_pThis->MouseEventHandler (Event, nButtons, nPosX, nPosY, nWheelMove);
 }
 
 void CKernel::DrawLine (int nPosX1, int nPosY1, int nPosX2, int nPosY2, TScreenColor Color)

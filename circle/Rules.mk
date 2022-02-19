@@ -80,17 +80,17 @@ $(error AARCH must be set to 32 or 64)
 endif
 
 ifeq ($(strip $(STDLIB_SUPPORT)),3)
-LIBC != "$(shell $(CPP) $(ARCH) -print-file-name=libc.a)"
+LIBC != $(CC) $(ARCH) -print-file-name=libc.a
 #LIBC != $(CPP) -marm -print-file-name=libc.a
 EXTRALIBS += $(LIBC)
-LIBSTDCPP != "$(shell $(CPP) $(ARCH) -print-file-name=libstdc++.a)"
+LIBSTDCPP != $(CPP) $(ARCH) -print-file-name=libstdc++.a
 #LIBSTDCPP != $(CPP) -marm -print-file-name=libstdc++.a
 EXTRALIBS += $(LIBSTDCPP)
-LIBGCC_EH != "$(shell $(CPP) $(ARCH) -print-file-name=libgcc_eh.a)"
+#LIBGCC_EH != "$(shell $(CPP) $(ARCH) -print-file-name=libgcc_eh.a)"
 #LIBGCC_EH != $(CPP) -marm -print-file-name=libgcc_eh.a
-ifneq ($(strip $(LIBGCC_EH)),"libgcc_eh.a")
-EXTRALIBS += $(LIBGCC_EH)
-endif
+#ifneq ($(strip $(LIBGCC_EH)),"libgcc_eh.a")
+#EXTRALIBS += $(LIBGCC_EH)
+#endif
 ifeq ($(strip $(AARCH)),64)
 CRTBEGIN = "$(shell $(CPP) $(ARCH) -print-file-name=crtbegin.o)"
 CRTEND   = "$(shell $(CPP) $(ARCH) -print-file-name=crtend.o)"
@@ -159,6 +159,7 @@ endif
 
 $(TARGET).img: $(OBJS) $(LIBS) $(CIRCLEHOME)/circle.ld
 	@echo "  LD    $(TARGET).elf"
+	@echo "  DEBUG: EXTRALIBS = $(EXTRALIBS)"
 	@$(LD) -o $(TARGET).elf -Map $(TARGET).map $(LDFLAGS) \
 		-T $(CIRCLEHOME)/circle.ld $(CRTBEGIN) $(OBJS) \
 		--start-group $(LIBS) $(EXTRALIBS) --end-group $(CRTEND)

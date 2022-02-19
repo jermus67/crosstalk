@@ -1302,7 +1302,8 @@ private:
     inline float extractFloat(int objectPointer)
     {
         std::uint32_t uint32 = (memory.fetchWord_ofObject(1, objectPointer) << 16) | memory.fetchWord_ofObject(0, objectPointer);
-        return * (float *) &uint32;
+        void *valuePointer = &uint32;
+        return * static_cast<float*>(valuePointer);
     }
 
     float popFloat();

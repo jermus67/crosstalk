@@ -20,7 +20,6 @@
 #ifndef _kernel_h
 #define _kernel_h
 
-#include <circle/memory.h>
 #include <circle/actled.h>
 #include <circle/koptions.h>
 #include <circle/devicenameservice.h>
@@ -56,22 +55,22 @@ public:
 	static CKernel *Get (void);
 	CMouseDevice *GetMouseDevice (void);
 
-        void GetMouseState (int *x, int *y, unsigned *buttons);
+    void GetMouseState (int *x, int *y, unsigned *buttons);
 	int GetKeyboardState (unsigned *keys);
 	unsigned GetTicks (void);
 
-        void SetMouseState (int x, int y);
+    void SetMouseState (int x, int y);
 
 	unsigned GetCursorType (void);
 	unsigned GetCursorColor (void);
 
 private:
-        static void KeyPressedHandler (const char *pString);
-        static void KeyStatusHandlerRawStub (unsigned char ucModifiers, const unsigned char RawKeys[6]);
-        void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
+    static void KeyPressedHandler (const char *pString);
+    static void KeyStatusHandlerRawStub (unsigned char ucModifiers, const unsigned char RawKeys[6]);
+    void KeyStatusHandlerRaw (unsigned char ucModifiers, const unsigned char RawKeys[6]);
 
-	static void MouseEventStub (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY);
-	void MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY);
+	static void MouseEventStub (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY, int nWheelMove);
+	void MouseEventHandler (TMouseEvent Event, unsigned nButtons, unsigned nPosX, unsigned nPosY, int nWheelMove);
 
 	void DrawLine (int nPosX1, int nPosY1, int nPosX2, int nPosY2, TScreenColor Color);
 
@@ -79,19 +78,18 @@ private:
 
 private:
 	// do not change this order
-	CMemorySystem		m_Memory;
-	CActLED			m_ActLED;
+	CActLED			    m_ActLED;
 	CKernelOptions		m_Options;
 	CDeviceNameService	m_DeviceNameService;
 	CScreenDevice		m_Screen;
 	CSerialDevice		m_Serial;
 	CExceptionHandler	m_ExceptionHandler;
 	CInterruptSystem	m_Interrupt;
-	CTimer			m_Timer;
-	CLogger			m_Logger;
+	CTimer			    m_Timer;
+	CLogger			    m_Logger;
 	CUSBHCIDevice		m_USBHCI;
-        CEMMCDevice             m_EMMC;
-        FATFS                   m_FileSystem;
+    CEMMCDevice         m_EMMC;
+    FATFS               m_FileSystem;
 
 	int m_nPosX = 0;
 	int m_nPosY = 0;
@@ -103,7 +101,7 @@ private:
 
 	unsigned m_nBootMode = 0;
 
-        int m_RawKeys[6] = {0};
+    int m_RawKeys[6] = {0};
 
 	volatile TShutdownMode m_ShutdownMode;
 

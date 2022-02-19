@@ -77,16 +77,24 @@ class VirtualMachine: public IHardwareAbstractionLayer
 {
 public:
     VirtualMachine(struct options& vm_options, CScreenDevice& m_Screen) :
-        vm_options(vm_options),
-        fileSystem(vm_options.root_directory),
-        interpreter(this, &fileSystem),
-        display_width(0), display_height(0),
-        scheduled_semaphore(0), input_semaphore(0), scheduled_time(0),
-        event_count(0), last_event_time(0),
-        quit_signalled(false), texture_needs_update(false),
-        image_name(vm_options.snapshot_name),
-        m_Screen(m_Screen), ticks(0),
-	old_mouseX(0), old_mouseY(0)
+            vm_options(vm_options),
+            fileSystem(vm_options.root_directory),
+            screen_initialized(0),
+            interpreter(this, &fileSystem),
+            input_queue(),
+            last_event_time(0),
+            event_count(0),
+            input_semaphore(0),
+            quit_signalled(false),
+            texture_needs_update(false),
+            display_width(0), display_height(0),
+            dirty_rect(),
+            scheduled_semaphore(0),
+            scheduled_time(0),
+            image_name(vm_options.snapshot_name),
+            m_Screen(m_Screen),
+            ticks(0),
+	        old_mouseX(0), old_mouseY(0)
     {
     }
     

@@ -161,13 +161,10 @@ public:
 
     int read(int file_handle, char *buffer, int bytes)
     {
-        FIL* fp;
         FRESULT fres;
         int bytes_read;
-        int pos;
 
         if (fdtofil[file_handle] != (FIL*)0) {
-            pos = fdtofil[file_handle]->fptr;
             fres = f_read(fdtofil[file_handle], buffer, bytes, (UINT*)&bytes_read);
             if (fres != FR_OK) return -1;
             return bytes_read;
@@ -176,7 +173,6 @@ public:
 
     int write(int file_handle, const char *buffer, int bytes)
     {
-        FIL* fp;
         FRESULT fres;
         int bytes_written;
 
@@ -189,11 +185,8 @@ public:
 
     bool truncate_to(int file_handle, int length)
     {
-        FIL* fp;
         FRESULT fres;
-        int bytes_written;
-        char s[80];
-        
+
         if (fdtofil[file_handle] != (FIL*)0) {
             fres = f_lseek(fdtofil[file_handle], length);
             if (fres != FR_OK) return false;
@@ -206,11 +199,8 @@ public:
 
     int file_size(int file_handle)
     {
-        FIL* fp;
         int fsize;
-        int bytes_written;
-        char s[80];
-        
+
         if (fdtofil[file_handle] != (FIL*)0) {
             fsize = f_size(fdtofil[file_handle]);
             // CLogger::Get ()->Write (FromKernel, LogDebug, "Checking file size fd %d = %08d\r\n", file_handle, fsize);
@@ -238,7 +228,6 @@ public:
     bool is_directory(const char *name)
     {
         FILINFO fi;
-        FRESULT fr;
 
         // CLogger::Get ()->Write (FromKernel, LogDebug, "is_directory: ");
         // CLogger::Get ()->Write (FromKernel, LogDebug, (char *)name);
@@ -275,11 +264,9 @@ public:
     void *open_dir(void)
     {
         DIR *dir;
-        FRESULT fr;
-        FILINFO fi;
 
         dir = (DIR*)malloc(sizeof(DIR));
-        fr = f_opendir(dir, (const char*)root_directory.c_str());
+        f_opendir(dir, (const char*)root_directory.c_str());
         return (void *)dir;
     }
 
@@ -375,9 +362,7 @@ public:
 
     int seek_to(int file_handle, int position)
     {
-        FIL* fp;
         FRESULT fres;
-        int bytes_written;
 
         if (fdtofil[file_handle] != (FIL*)0) {
             fres = f_lseek(fdtofil[file_handle], position);

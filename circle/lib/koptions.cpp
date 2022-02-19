@@ -35,7 +35,7 @@ CKernelOptions::CKernelOptions (void)
 	m_nSoundOption (0),
 	m_CPUSpeed (CPUSpeedLow),
 	m_nSoCMaxTemp (60),
-    m_bTouchScreenValid (FALSE)
+    m_bTouchScreenValid (FALSE),
 	m_CursorType (0),
 	m_nCursorColor (0),
 	m_nBootMode (0)
