@@ -311,6 +311,12 @@ bool ObjectMemory::loadSnapshot(IFileSystem *fileSystem, const char *fileName)
     if (bootmode > 0) {
         fileSystem->close_file(fd);
     }
+
+    if (succeeded) {
+        CLogger::Get ()->Write ("objmemory", LogDebug, "Successfully loaded snapshot");
+    } else {
+        CLogger::Get ()->Write ("objmemorr", LogDebug, "Failed to log snapshot");
+    }
     
     return succeeded;
 }
