@@ -80,10 +80,10 @@ $(error AARCH must be set to 32 or 64)
 endif
 
 ifeq ($(strip $(STDLIB_SUPPORT)),3)
-LIBC != $(CC) $(ARCH) -print-file-name=libc.a
+LIBC = "$(shell $(CC) $(ARCH) -print-file-name=libc.a)"
 #LIBC != $(CPP) -marm -print-file-name=libc.a
 EXTRALIBS += $(LIBC)
-LIBSTDCPP != $(CPP) $(ARCH) -print-file-name=libstdc++.a
+LIBSTDCPP = "$(shell $(CPP) $(ARCH) -print-file-name=libstdc++.a)"
 #LIBSTDCPP != $(CPP) -marm -print-file-name=libstdc++.a
 EXTRALIBS += $(LIBSTDCPP)
 #LIBGCC_EH != "$(shell $(CPP) $(ARCH) -print-file-name=libgcc_eh.a)"
