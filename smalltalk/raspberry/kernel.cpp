@@ -123,7 +123,8 @@ void CKernel::smalltalk (void)
 	vm_options.cycles_per_frame = 1800;
 	vm_options.display_scale = 1;
 
-    auto vm = std::make_shared<VirtualMachine>(VirtualMachine(vm_options, m_Screen));
+    //auto vm = std::make_shared<VirtualMachine>(VirtualMachine(vm_options, m_Screen));
+    VirtualMachine* vm = new VirtualMachine(vm_options, m_Screen);
 
     m_Logger.Write (FromKernel, LogDebug, "VM init");
 	if (vm->init())
@@ -135,6 +136,8 @@ void CKernel::smalltalk (void)
 	{
 		m_Logger.Write (FromKernel, LogError, "VM failed to initialize (invalid/missing directory or snapshot?)");
 	}
+
+    delete vm;
 }
 
 TShutdownMode CKernel::Run (void)
