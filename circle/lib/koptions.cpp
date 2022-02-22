@@ -70,7 +70,7 @@ CKernelOptions::CKernelOptions (void)
 		{
 			unsigned nValue;
 			if (   (nValue = GetDecimal (pValue)) != INVALID_VALUE
-			    && 640 <= nValue && nValue <= 1980)
+			    && 640 <= nValue && nValue <= 1920)
 			{
 				m_nWidth = nValue;
 			}
